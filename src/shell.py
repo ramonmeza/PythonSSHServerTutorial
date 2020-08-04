@@ -48,8 +48,3 @@ class Shell(Cmd):
         # if a command returns True, the cmdloop() will stop.
         # this acts like disconnecting from the shell.
         return True
-
-
-if __name__ == '__main__':
-    my_shell = Shell()
-    my_shell.cmdloop()
