@@ -166,7 +166,55 @@ Lastly, we create our abstract `connection_function()` function. This will let u
 ```
 
 ### Creating the ServerInterface
+http://docs.paramiko.org/en/stable/api/server.html
+https://github.com/paramiko/paramiko/blob/master/demos/demo_server.py
 
+This is probably the worst part of this entire project. Finding information on creating an SSH server is few and far between, but I was able to kind of piece it together, at least to the point where it works. Preface aside, we are going to be implementing `ServerInterface` from the `paramiko` package. This interface allows us to set up the SSH authentication and gives us access to connecting clients' stdin and stdout streams. This is essential to getting our SSH shell working, since `paramiko` takes care of the low level SSH stuff, like transports. Let's get on with it.
+
+First let's import `paramiko` and create our class which inherits from `ServerInterface`.
+
+```py
+import paramiko
+
+class SshServerInterface(paramiko.ServerInterface):
+```
+
+Now we can override some methods that we need in order to get authentication working. These are methods you can read about in the `paramiko` documentation link provide at the top of this section. If you omit these methods you won't be able to get your SSH client to connect to the server, since by default some of these methods will return `False`.
+
+```py
+def check_channel_request(self, kind, chanid):
+    if kind == "session":
+        return paramiko.OPEN_SUCCEEDED
+    return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+
+def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
+    return True
+
+def check_channel_shell_request(self, channel):
+    return True
+```
+
+I'll go over a little of what I know about these methods. First, we have to understand what a channel is. Channels provide a secure communication route between the client and the host over an unsecure network. Since we are creating an SSH server, we need to be able to create these channels to allow clients to connect to us. For this, we will need to override `check_channel_request()` to return `OPEN_SUCCEEDED` when the `kind` of channel requested is a `session`. Next we need to override `check_channel_pty_request()` to return `True`. This allows our client to interact with our shell. Finally we can override `check_channel_shell_request()` to return `True`, which allows us to provide the channel with a shell we can connect to it (done in the next section). 
+
+With all of that out of the way, let's override the method that will allow us to use username and password authentication. If you want to use public SSH keys or gssapi authentication instead, you will need to override the corresponding methods found in the `paramiko` documentation link. You should also look at the `demo_server.py` link I provided at the top of this section, as well.
+
+```py
+def check_auth_password(self, username, password):
+    if (username == "admin") and (password == "password"):
+        return paramiko.AUTH_SUCCESSFUL
+    return paramiko.AUTH_FAILED
+```
+
+It's as simple as that. Typically, storing usernames and passwords in plain text is a bad idea, but since this isn't a tutorial on application security, it will do, but I urge you to come up with a better solution if you are using this publicly. You will want to create a database that you store your username and hashed passwords, where you will then be able to fetch, unhash and check their authenticity here.
+
+This next section is optional, but will add a little flair to your SSH server. We will override the `get_banner()` method, which will display a message when a client first connects to our server but is not yet authenticated. This is different than our shell's `intro` property, since that happens when you get to the shell. The banner is displayed before that point, so if you define `get_banner()` here and `intro` in your shell, first your banner will show, after authentication your shell's `intro` will show.
+
+```py
+def get_banner(self):
+    return ('My SSH Server\r\n', 'en-US')
+```
+
+Okay, that wasn't as painful as I thought it would be, so let's get on to the real fun part of this.
 
 ### Creating the SSH Server
 
