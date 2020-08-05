@@ -61,5 +61,5 @@ class ServerBase(ABC):
                 pass
 
     @abstractmethod
-    def connection_method(self, client):
+    def connection_function(self, client):
         pass
