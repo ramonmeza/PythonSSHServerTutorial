@@ -1,4 +1,6 @@
+import os
 from src.ssh_server import SshServer
+
 
 if __name__ == '__main__':
     # How to Generate your SSH keys
@@ -14,8 +16,8 @@ if __name__ == '__main__':
     # Next, open cmd as administrator. Enter the command `ssh-keygen` and follow the on screen prompts.
     # The location of the key will be displayed. Copy that and paste the location here.
     # If you put a password, include it as the second parameter, otherwise don't include it.
-    server = SshServer('C:/Users/ramon/.ssh/id_rsa')
+    server = SshServer(os.path.expanduser('~/.ssh/id_rsa'))
 
     # Start the server, you can give it a custom IP address and port, or
     # leave it empty to run on 127.0.0.1:22
-    server.start()
+    server.start("0.0.0.0", int(os.getenv("SSH_PORT", 22)))

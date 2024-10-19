@@ -1,16 +1,46 @@
 # PythonSSHServerTutorial
+
 A tutorial on creating an SSH server using Python 3 and the `paramiko` package. It will also cover how to "dockerize" the application using Docker to allow it to be run on other platforms.
 
-### Prerequisites
+## Prerequisites
+
 Applications:
-* Python 3.8+
-* Docker
-* OpenSSH (client and server)
+
+- Python 3.8+
+- venv
+- Docker
+- OpenSSH (client and server)
 
 `pip` packages:
-* paramiko
+
+- paramiko
+
+## Creating the Application
+
+### Create a `venv`
+
+A virtual environment allows you to separate dependencies used in your app from those globally installed on your local machine. It's probably a good idea to use a `venv` if you plan to redistribute your code.
+
+```sh
+python -m venv .env
+```
+
+You can activate your environment using the following command:
+
+```sh
+./.env/Scripts/activate
+```
+
+Once activated, any `python` or `pip` commands you make will be executed using `python` and `pip` executable within your `venv`.
+
+Install the following:
+
+```sh
+pip install paramiko
+```
 
 ### Creating the Shell
+
 Our shell will extend the `cmd` module's `Cmd` class. The `Cmd` class provides us a way to create our own custom shell. It provides a `cmdloop()` function that will wait for input and display output. This class also makes it trivial to add custom commands to our shell.
 
 We start by importing the `cmd` module's `Cmd` class and extending from it in our shell class:
@@ -29,13 +59,13 @@ use_rawinput=False
 prompt='My Shell> '
 ```
 
-| Property | Description |
-|-|-|
-| `intro` | A one time message to be output when the `cmdloop()` function is called. |
+| Property       | Description                                                                                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intro`        | A one time message to be output when the `cmdloop()` function is called.                                                                                             |
 | `use_rawinput` | Instead of using `input()`, this will use `stdout.write()` and `stdin.readline()`, which means we can use any `TextIO` instead of just `sys.stdin` and `sys.stdout`. |
-| `prompt` | allows us to use a custom string to be displayed at the beginning of each line. This will not be included in any input that we get. |
+| `prompt`       | allows us to use a custom string to be displayed at the beginning of each line. This will not be included in any input that we get.                                  |
 
-Now we can create our `__init__()` function, which will take two I/O stream objects, one for `stdin` and one for `stdout`, and call the base `Cmd` constructor. 
+Now we can create our `__init__()` function, which will take two I/O stream objects, one for `stdin` and one for `stdout`, and call the base `Cmd` constructor.
 
 ```py
 def __init__(self, stdin=None, stdout=None):
@@ -69,7 +99,7 @@ def do_bye(self, arg):
     return True
 ```
 
-One final thing we can do, just to make things look a little nicer to the client, is override the `emptyline()` function, which will execute when the client enters an empty command. 
+One final thing we can do, just to make things look a little nicer to the client, is override the `emptyline()` function, which will execute when the client enters an empty command.
 
 ```py
 def emptyline(self):
@@ -87,6 +117,7 @@ if __name__ == '__main__':
 ```
 
 When we run the code we should get something like this as output.
+
 ```
 Custom SSH Shell
 My Shell> greet
@@ -98,7 +129,8 @@ See you later!
 ```
 
 ### Creating the Server Base Class
-We can now move on to creating the server base class, which will contain functionality for opening a socket, listening on a separate thread, and accepting a connection, where then it will call an abstract method to complete the connection and setup the shell for the connected client. The reason we do this as a base class, and not as a single server class is so we can support different connection types, such as Telnet. 
+
+We can now move on to creating the server base class, which will contain functionality for opening a socket, listening on a separate thread, and accepting a connection, where then it will call an abstract method to complete the connection and setup the shell for the connected client. The reason we do this as a base class, and not as a single server class is so we can support different connection types, such as Telnet.
 
 First we need to import some modules and extend the ABC class in our own `ServerBase` class.
 
@@ -121,12 +153,12 @@ def __init__(self):
     self._listen_thread = None
 ```
 
-| Property | Description |
-|-|-|
-| `_is_running` | a multithreaded event, which is basically a thread-safe boolean |
-| `_socket` | this socket will be used to listen to incoming connections |
-| `client_shell` | this will contain the shell for the connected client. We don't yet initialize it, since we need to get the `stdin` and `stdout` objects after the connection is made. |
-| `_listen_thread` | this will contain the thread that will listen for incoming connections and data. |
+| Property         | Description                                                                                                                                                           |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_is_running`    | a multithreaded event, which is basically a thread-safe boolean                                                                                                       |
+| `_socket`        | this socket will be used to listen to incoming connections                                                                                                            |
+| `client_shell`   | this will contain the shell for the connected client. We don't yet initialize it, since we need to get the `stdin` and `stdout` objects after the connection is made. |
+| `_listen_thread` | this will contain the thread that will listen for incoming connections and data.                                                                                      |
 
 Next we create the `start()` and `stop()` functions. These are relatively simple, but here's a quick explanation of both. `start()` will create the socket and setup the socket options. It's important to note that the socket option `SO_REUSEPORT` is not available on Windows platforms, so we wrap it with a platform check. `start()` also creates the listen thread and starts it, which will run the `listen()` function that we will tackle next. `stop()` is even easier, as it simply joins the listen thread and closes the socket.
 
@@ -176,6 +208,7 @@ Lastly, we create our abstract `connection_function()` function. This will let u
 ```
 
 ### Creating the ServerInterface
+
 [`ServerInterface` Documentation](http://docs.paramiko.org/en/stable/api/server.html)
 [demo_server.py from paramiko repository](https://github.com/paramiko/paramiko/blob/master/demos/demo_server.py)
 
@@ -204,7 +237,7 @@ def check_channel_shell_request(self, channel):
     return True
 ```
 
-I'll go over a little of what I know about these methods. First, we have to understand what a channel is. Channels provide a secure communication route between the client and the host over an unsecure network. Since we are creating an SSH server, we need to be able to create these channels to allow clients to connect to us. For this, we will need to override `check_channel_request()` to return `OPEN_SUCCEEDED` when the `kind` of channel requested is a `session`. Next we need to override `check_channel_pty_request()` to return `True`. This allows our client to interact with our shell. Finally we can override `check_channel_shell_request()` to return `True`, which allows us to provide the channel with a shell we can connect to it (done in the next section). 
+I'll go over a little of what I know about these methods. First, we have to understand what a channel is. Channels provide a secure communication route between the client and the host over an unsecure network. Since we are creating an SSH server, we need to be able to create these channels to allow clients to connect to us. For this, we will need to override `check_channel_request()` to return `OPEN_SUCCEEDED` when the `kind` of channel requested is a `session`. Next we need to override `check_channel_pty_request()` to return `True`. This allows our client to interact with our shell. Finally we can override `check_channel_shell_request()` to return `True`, which allows us to provide the channel with a shell we can connect to it (done in the next section).
 
 With all of that out of the way, let's override the method that will allow us to use username and password authentication. If you want to use public SSH keys or gssapi authentication instead, you will need to override the corresponding methods found in the `paramiko` documentation link. You should also look at the `demo_server.py` link I provided at the top of this section, which proved to be a valuable resource while creating this tutorial.
 
@@ -227,6 +260,7 @@ def get_banner(self):
 Okay, that wasn't as painful as I thought it would be, so let's get on to the real fun part of this.
 
 ### Creating the SSH Server
+
 The `SshServer` class is where things start to get spicy. That said, the class is actually very simple since we are just implementing the `connection_function()` from the `ServerBase` class we created earlier. Let's start by importing some modules we've created, as well as `paramiko`, and create our server class which will inherit from `ServerBase`.
 
 ```py
@@ -272,8 +306,9 @@ def connection_function(self, client):
         pass
 ```
 
-# Ruuning the SSH Server
-Finally we can test all of our code up to this point. First we import our `SshServer` class we just created. Next we simply create our `SshServer`, passing it the location of our private RSA key and the corresponding password and start the server. If you need to create your SSH keys, I suggest either looking at `main.py` in this repository, or looking at either [this article](https://phoenixnap.com/kb/generate-ssh-key-windows-10), which explains how to do it on windows, or [this one](https://www.ssh.com/ssh/keygen/) which explains how to do it on Linux. 
+### Running the SSH Server
+
+Finally we can test all of our code up to this point. First we import our `SshServer` class we just created. Next we simply create our `SshServer`, passing it the location of our private RSA key and the corresponding password and start the server. If you need to create your SSH keys, I suggest either looking at `main.py` in this repository, or looking at either [this article](https://phoenixnap.com/kb/generate-ssh-key-windows-10), which explains how to do it on windows, or [this one](https://www.ssh.com/ssh/keygen/) which explains how to do it on Linux.
 
 ```py
 from src.ssh_server import SshServer
@@ -283,11 +318,66 @@ if __name__ == '__main__':
     server.start()
 ```
 
-We now run the code using the command `python3 main.py`. We can open up a new Terminal/PowerShell/CMD window and try to connect to our SSH server using the following command: `ssh admin@127.0.0.1 -p 22`. This command will try to connect to an SSH server running on 127.0.0.1:22 as the username `admin`. If you use a different username, change it here. Once you run this command, you should see the banner text you set in our `SshServerInterface` class earlier, as well as a prompt to enter our password. For this example, we can type in `password` and we are given access to an instance of our custom shell! Exciting! 
+We now run the code using the command `python3 main.py`. We can open up a new Terminal/PowerShell/CMD window and try to connect to our SSH server using the following command: `ssh admin@127.0.0.1 -p 22`. This command will try to connect to an SSH server running on 127.0.0.1:22 as the username `admin`. If you use a different username, change it here. Once you run this command, you should see the banner text you set in our `SshServerInterface` class earlier, as well as a prompt to enter our password. For this example, we can type in `password` and we are given access to an instance of our custom shell! Exciting!
 
 You've noticed there are some issues. Yeah, I know. It's not perfect, but hopefully this will get people started for creating their own custom shells and custom SSH servers. If you know how to fix any of the issues, like how the spacing is all out of whack, please create a pull request so we can fix these issues and provide the correct information to everyone.
 
-### Dockerize the App
+## Dockerize the App
+
 Cool, so our SSH server works. Now we want to use this somewhere else. Docker is the answer. Let's learn how we can dockerize our app and get it running everywhere (that has Docker installed)!
 
+### `requirements.txt`
+
+`requirements.txt` is a file created for us by `pip`. It includes all of the packages that are installed within our environment. If you used `venv` to create your environment, this will result is a small file with just the packages we've used. Run the following command to generate your `requirements.txt` file once you're ready to Dockerize your application:
+
+```sh
+pip freeze > requirements.txt
+```
+
+### Application Modifications
+
+We need to ensure our private key is generated within our Docker container and that we use this file within our container as our private key within our app. This is as simple as changing the path to our private key in `main.py` to `~/.ssh/id_rsa`.
+
+### `Dockerfile`
+
+`Dockerfile` is where you define environment your container will run within. Technically, your `Dockerfile` is used to create an "image", which will then be used to create a "container" which runs your application. You can think of the container as an instance of the image.
+
+When you break down a `Dockerfile`, you typically will see a `FROM` tag at the top, specifying the base image your image will utilize. In our case, we use `ubuntu`. You can also see within the file are `RUN` commands, which do exactly what they say and run a given command within the build stage of your `Dockerfile`. To reiterate, our `Dockerfile` is our method of defining our environment. You can sort of think of this as setting up a new PC and the commands you'd use to install what you need to get your app running. There's a TON of Docker images to base your `Dockerfile` off of, and it can save you a lot of work if you find a base image that does what you need for your specific case.
+
+For our app, we simply use Ubuntu, install updates, Python and pip, copy our files into our container, install our pip requirements, expose our desired ports and finally run our application.
+
+An important note to remember about Docker and writing `Dockerfile` is to keep commands which won't change up top. Generally speaking, installations should be higher in your `Dockerfile` and copying/compiling your application files should be toward the bottom. This allows Docker to cache your images so you don't have to constantly wait for Docker to build and install prerequisites every time you change your source code.
+
+### Building and Running the `Dockerfile`
+
+Now that you've defined the `Dockerfile`, you can build a corresponding image we will eventually use for our container. Run the following command:
+
+```sh
+docker build . --tag python_ssh_server
+```
+
+The `build` command takes the path to the directory containing your `Dockerfile` and a tag which we use to easily reference our image in our next command:
+
+```sh
+docker run --rm -e SSH_PORT=2222 -p 2223:2222 --name my_ssh_app_container python_ssh_server:latest
+```
+
+The `run` command allows use to specify the name of our container and the image we wish to instantiate from. I also include `--rm`, which removes the container once execution is completed. We also need to specify the ports we wish to expose from our container using `-p`. The syntax for `-p` is `-p [local_port]:[container_port]`, where `container_port` is the port your application uses, and `local_port` is the port which will be mapped to the container. When `local_port` is set to 2223, we connect to our SSH server using `ssh 0.0.0.0 -p 2223` from our local machine.
+
+Read more about these flags in the Docker documentation if you wish.
+
+### Connecting to your Containerized SSH Server
+
+Now that the Docker container is running, you simply SSH in like you would any other SSH server:
+
+```sh
+ssh admin@0.0.0.0 -p 2223
+```
+
+Here the server address is `0.0.0.0` (default for Docker containers). We also specify our port using `-p`, where the port matches what we mapped in the container. Once you run this command, you should be connected to your SSH server, running from within a Docker container!
+
 ### Conclusion
+
+We did it! We created a custom SSH shell using Python, which can run anywhere Docker is installed. If you have questions, please raise an issue and I'll do my best to answer your question to the best of my ability and within a _"timely"_ (it may take a long time) manner.
+
+Thanks for sticking around and learning with me.
